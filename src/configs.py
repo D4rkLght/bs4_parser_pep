@@ -6,6 +6,8 @@ from constants import BASE_DIR
 
 LOG_FORMAT = '"%(asctime)s - [%(levelname)s] - %(message)s"'
 DT_FORMAT = '%d.%m.%Y %H:%M:%S'
+MAX_SIZE_OF_ONE_FILE = 10 ** 6
+MAX_NUMBER_OF_LOG_FILES = 5
 
 
 def configure_argument_parser(available_modes):
@@ -35,7 +37,9 @@ def configure_logging():
     log_dir.mkdir(exist_ok=True)
     log_file = log_dir / 'parser.log'
     rotating_handler = RotatingFileHandler(
-        log_file, maxBytes=10 ** 6, backupCount=5
+        log_file,
+        maxBytes=MAX_SIZE_OF_ONE_FILE,
+        backupCount=MAX_NUMBER_OF_LOG_FILES
     )
     logging.basicConfig(
         datefmt=DT_FORMAT,

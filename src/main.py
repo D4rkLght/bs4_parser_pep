@@ -1,5 +1,6 @@
 import logging
 import re
+from collections import defaultdict
 from urllib.parse import urljoin
 
 import requests_cache
@@ -24,7 +25,7 @@ def whats_new(session):
                                               attrs={'class': 'toctree-l1'})
     results = [('Ссылка на статью', 'Заголовок', 'Редактор, Автор')]
     for section in tqdm(sections_by_python):
-        version_a_tag = section.find('a')
+        version_a_tag = find_tag(section, 'a')
         href = version_a_tag['href']
         version_link = urljoin(whats_new_url, href)
         response = get_response(session, version_link)
@@ -32,7 +33,7 @@ def whats_new(session):
             continue
         soup = BeautifulSoup(response.text, 'lxml')
         h1 = find_tag(soup, 'h1')
-        dl = soup.find('dl').text.replace('\n', ' ')
+        dl = find_tag(soup, 'dl').text.replace('\n', ' ')
         results.append(
             (version_link, h1, dl)
         )
@@ -44,7 +45,7 @@ def latest_versions(session):
     if response is None:
         return
     soup = BeautifulSoup(response.text, 'lxml')
-    sidebar = soup.find('div', class_='sphinxsidebarwrapper')
+    sidebar = find_tag(soup, 'div', attrs={'class': 'sphinxsidebarwrapper'})
     ul_tags = sidebar.find_all('ul')
     for ul in ul_tags:
         if 'All versions' in ul.text:
@@ -73,9 +74,10 @@ def download(session):
     if response is None:
         return
     soup = BeautifulSoup(response.text, 'lxml')
-    main_tag = soup.find('div', {'role': 'main'})
-    table_tag = main_tag.find('table', {'class': 'docutils'})
-    pdf_a4_tag = table_tag.find('a', {'href': re.compile(r'.+pdf-a4\.zip$')})
+    main_tag = find_tag(soup, 'div', attrs={'role': 'main'})
+    table_tag = find_tag(main_tag, 'table', attrs={'class': 'docutils'})
+    pdf_a4_tag = find_tag(table_tag, 'a',
+                          attrs={'href': re.compile(r'.+pdf-a4\.zip$')})
     pdf_a4_link = pdf_a4_tag['href']
     archive_url = urljoin(downloads_url, pdf_a4_link)
     filename = archive_url.split('/')[-1]
@@ -94,12 +96,15 @@ def pep(session):
     soup = BeautifulSoup(response.text, 'lxml')
     main_tag = find_tag(soup, 'section', {'id': 'numerical-index'})
     peps = main_tag.find_all('tr')[1:]
-    count_status = {}
+    count_status = defaultdict(int)
     results = [('Статус', 'Количество')]
-    for pep in peps:
+    loggs = []
+    for pep in tqdm(peps):
         link = pep.a['href']
         pep_link = urljoin(PEP_URL, link)
         response = get_response(session, pep_link)
+        if response is None:
+            continue
         soup = BeautifulSoup(response.text, 'lxml')
         card = find_tag(soup, 'section', {'id': 'pep-content'})
         card_dl = find_tag(card, 'dl', {'class': 'rfc2822 field-list simple'})
@@ -107,22 +112,19 @@ def pep(session):
             if tag.name == 'dt' and tag.text == 'Status:':
                 status = tag.next_sibling.next_sibling.string
                 status_chart = pep.td.text[1:]
-                if status in count_status:
-                    count_status[status] += 1
-                else:
-                    count_status[status] = 1
+                count_status[status] = count_status.get(status, 0) + 1
                 if status[0] != status_chart:
-                    logging.info(
+                    loggs.append(
                         '\nНесовпадающие статусы:\n'
                         f'{pep_link}\n'
                         f'Статус в карточке: {status}\n'
                         'Ожидаемые статусы:\n'
                         f'{EXPECTED_STATUS[status_chart]}\n'
                     )
+    logging.info('\n'.join(loggs))
     total = sum(count_status.values())
-    for key, value in count_status.items():
-        results.append((key, str(value)))
-    results.append(('Total', str(total)))
+    results.extend(count_status.items())
+    results.append(('Total', total))
     return results
 
 
