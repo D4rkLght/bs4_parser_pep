@@ -3,8 +3,7 @@
 [![Pytest](https://img.shields.io/badge/Pytest-464646?style=flat-square&logo=pytest)](https://docs.pytest.org/en/6.2.x/)
 
 # Проект парсинга pep
-Парсер для сайта https://docs.python.org/3/ и https://peps.python.org/
-Парсинг данных обо всех документах PEP;
+Парсинг данных обо всех документах PEP для сайта https://docs.python.org/3/ и https://peps.python.org/
 
 ## Установка:
 Клонируйте репозиторий:
